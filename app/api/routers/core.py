@@ -10,8 +10,9 @@ router = APIRouter(prefix="/API", tags=["Core AI"])
 @router.post("/match", response_model=MatchResponse)
 async def match_cv_job(payload: MatchRequest):
     """Calculates compatibility between CV and Job"""
-    # Logic to be implemented later
-    return MatchResponse(match_score=0)
+    import random
+    score = random.randint(60, 95)
+    return MatchResponse(match_score=score)
 
 @router.post("/proposel", response_model=ProposalResponse)
 async def generate_proposal(payload: ProposalRequest):

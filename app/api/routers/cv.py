@@ -42,7 +42,9 @@ async def build_job_cv(payload: CVJobRequest):
 @router.post("/optimiz/ATS", response_model=OptimizeATSResponse)
 async def optimize_ats(payload: OptimizeATSRequest):
     """Analyzes CV for ATS compatibility (Placeholder for logic)"""
-    return OptimizeATSResponse(feedback="ATS Score logic to be implemented", ats_score=85)
+    import random
+    score = random.randint(60, 95)
+    return OptimizeATSResponse(feedback="ATS Score logic to be implemented", ats_score=score)
 
 @router.post("/optimiz/user_interaction", response_model=UserInteractResponse)
 async def user_interact(payload: UserInteractRequest):
