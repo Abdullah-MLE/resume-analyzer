@@ -42,9 +42,19 @@ async def build_job_cv(payload: CVJobRequest):
 @router.post("/optimiz/ATS", response_model=OptimizeATSResponse)
 async def optimize_ats(payload: OptimizeATSRequest):
     """Analyzes CV for ATS compatibility (Placeholder for logic)"""
+    import json
     import random
+    
+    # Convert CVSchema into text format for AI/processing
+    cv_text = json.dumps(payload.cv.model_dump(by_alias=True), indent=2)
+    
+    # Placeholder logic (could pass cv_text to an AI model)
     score = random.randint(60, 95)
-    return OptimizeATSResponse(feedback="ATS Score logic to be implemented", ats_score=score)
+    return OptimizeATSResponse(
+        feedback=f"ATS Score logic to be implemented. Received CV with length: {len(cv_text)} chars.",
+        ats_score=score
+    )
+
 
 @router.post("/optimiz/user_interaction", response_model=UserInteractResponse)
 async def user_interact(payload: UserInteractRequest):

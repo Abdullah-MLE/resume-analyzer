@@ -34,9 +34,6 @@ class MatchRequest(BaseModel):
 class MatchResponse(BaseModel):
     match_score: int
 
-class OptimizeATSRequest(BaseModel):
-    cv_text: str
-
 class OptimizeATSResponse(BaseModel):
     feedback: str
     ats_score: int
@@ -81,6 +78,9 @@ class CVSchema(BaseModel):
 
     class Config:
         populate_by_name = True
+
+class OptimizeATSRequest(BaseModel):
+    cv: CVSchema
 
 class CVProfileRequest(BaseModel):
     user_data: str
