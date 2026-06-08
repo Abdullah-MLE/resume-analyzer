@@ -97,38 +97,40 @@ def _scrape_listing_page(page_url: str, _limit: int = 25) -> List[Dict[str, str]
     return results
 
 from app.services.db_services import save_job, get_existing_urls
+from app.core.logger import get_logger
+
+_wuzzuf_logger = get_logger("scraper")
 
 def fetch_wuzzuf_jobs(pages: int = 1, list_url: str = DEFAULT_URL) -> List[Dict[str, str]]:
     """
-    Fetches Wuzzuf jobs from the listing pages directly via card extraction,
-    avoiding individual job page fetches for speed.
+    Fetches Wuzzuf jobs from the listing pages directly via card extraction.
+    Sequential to keep logs clean and avoid bans.
     """
     def build_url(page: int) -> str:
         if page == 0: return list_url
         sep = "&" if "?" in list_url else "?"
         return f"{list_url}{sep}page={page}"
 
-    page_urls = [build_url(p) for p in range(pages)]
-
     results = []
-    import concurrent.futures
-    max_workers = min(5, pages)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {executor.submit(_scrape_listing_page, url): url for url in page_urls}
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                page_results = future.result()
-                
-                # Check DB
-                all_urls = [r["url"] for r in page_results if r.get("url")]
-                existing_urls = get_existing_urls(all_urls, "opportunities_job")
-                
-                for item in page_results:
-                    if item["url"] not in existing_urls:
-                        item["source_platform"] = "Wuzzuf"
-                        results.append(item)
-                        save_job(item)
-                        
-            except Exception as exc:
-                print(f"[wuzzuf] error: {exc}")
+    for p in range(pages):
+        url = build_url(p)
+        try:
+            page_results = _scrape_listing_page(url)
+            if not page_results:
+                continue
+
+            # Check DB
+            all_urls = [r["url"] for r in page_results if r.get("url")]
+            existing_urls = get_existing_urls(all_urls, "opportunities_job")
+
+            for item in page_results:
+                if item["url"] not in existing_urls:
+                    item["source_platform"] = "Wuzzuf"
+                    results.append(item)
+                    save_job(item)
+
+        except Exception as exc:
+            _wuzzuf_logger.warning(f"  Wuzzuf: page {p} error: {type(exc).__name__}")
+
     return results
+

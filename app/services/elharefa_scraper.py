@@ -1,6 +1,9 @@
 from typing import List, Dict
 from app.services.scraper_utils import fetch_html
+from app.core.logger import get_logger
 import requests
+
+_logger = get_logger("scraper")
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -16,7 +19,7 @@ def fetch_jobs_api(page_index: int, size: int = 25) -> List[Dict]:
         data = r.json()
         return data.get("items", [])
     except Exception as e:
-        print(f"[elharefa] error fetching index {page_index}: {e}")
+        _logger.warning(f"  Elharefa: API error page {page_index}: {type(e).__name__}")
         return []
 
 def map_item(item: Dict) -> Dict[str, str]:

@@ -142,10 +142,10 @@ def _build_text_for_profile(row: Dict, skills: List[str] = None) -> str:
 def _embed_rows(rows, text_builder, skills_map, table_name, label):
     """Generate embeddings for *rows*, update DB. Returns list of embedded IDs."""
     if not rows:
-        logger.info(f"[Embedding] No new {label} to embed.")
+        logger.debug(f"[EMBEDDING] {label}: nothing to embed")
         return []
 
-    logger.info(f"[Embedding] {len(rows)} {label} without embeddings → generating ...")
+    logger.info(f"[EMBEDDING] {label}: {len(rows)} items → generating ...")
 
     texts = [text_builder(r, skills_map.get(r["id"], [])) for r in rows]
     embeddings = generate_embeddings_batch(texts)
@@ -156,9 +156,9 @@ def _embed_rows(rows, text_builder, skills_map, table_name, label):
         if update_embedding(table_name, row["id"], embeddings[i]):
             embedded_ids.append(row["id"])
         else:
-            logger.warning(f"[Embedding] Failed to save embedding for {label} id={row['id']}")
+            logger.warning(f"[EMBEDDING] {label} id={row['id']}: save failed")
 
-    logger.info(f"[Embedding] Embedded {len(embedded_ids)}/{len(rows)} {label}.")
+    logger.info(f"[EMBEDDING] {label}: {len(embedded_ids)}/{len(rows)} done")
     return embedded_ids
 
 
@@ -217,9 +217,6 @@ def run_embedding_pipeline() -> Dict:
 
     Returns a dict mapping entity type → list of newly embedded IDs.
     """
-    logger.info("=" * 60)
-    logger.info("[Embedding Pipeline] Starting ...")
-
     result = {
         "new_jobs": embed_new_jobs(),
         "new_projects": embed_new_projects(),
@@ -228,6 +225,5 @@ def run_embedding_pipeline() -> Dict:
     }
 
     total = sum(len(v) for v in result.values())
-    logger.info(f"[Embedding Pipeline] Done — {total} new embeddings generated.")
-    logger.info("=" * 60)
+    logger.info(f"[EMBEDDING] Pipeline done — {total} new embeddings")
     return result

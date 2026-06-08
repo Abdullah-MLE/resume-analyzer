@@ -79,7 +79,7 @@ def _get_existing_match_keys() -> Set[Tuple]:
             for r in data
         }
     except Exception as e:
-        logger.error(f"[Matching] Error loading existing match keys: {e}")
+        logger.error(f"[MATCHING] Error loading existing match keys: {e}")
         return set()
 
 
@@ -98,13 +98,13 @@ def _save_results_batch(results: List[Dict]) -> int:
             supabase.table("matching_matchresult").insert(chunk).execute()
             saved += len(chunk)
         except Exception as e:
-            logger.warning(f"[Matching] Batch insert failed ({e}), falling back to one-by-one ...")
+            logger.warning(f"[MATCHING] Batch insert failed, falling back to one-by-one ...")
             for record in chunk:
                 try:
                     supabase.table("matching_matchresult").insert(record).execute()
                     saved += 1
                 except Exception as inner:
-                    logger.error(f"[Matching] Single insert failed: {inner}")
+                    logger.error(f"[MATCHING] Single insert failed: {type(inner).__name__}")
     return saved
 
 
@@ -125,7 +125,7 @@ def _match_opportunities_to_users(
     if not opp_rows or not user_rows:
         return 0
 
-    logger.info(f"[Matching] {label}: {len(opp_rows)} opportunities × {len(user_rows)} users ...")
+    logger.info(f"[MATCHING] {label}: {len(opp_rows)} × {len(user_rows)} ...")
 
     opp_embs = [_parse_embedding(r["embedding"]) for r in opp_rows]
     usr_embs = [_parse_embedding(r["embedding"]) for r in user_rows]
@@ -168,7 +168,7 @@ def _match_opportunities_to_users(
             existing_keys.add(key)  # prevent duplicates within the same batch
 
     saved = _save_results_batch(results)
-    logger.info(f"[Matching] {label}: saved {saved} new match results.")
+    logger.info(f"[MATCHING] {label}: {saved} new matches saved")
     return saved
 
 
@@ -186,7 +186,7 @@ def match_jobs_to_cvs(job_ids: List[int] = None) -> int:
         not_null_col="embedding", eq_filters={"is_base": True},
     )
     if not jobs or not cvs:
-        logger.info("[Matching] Skipping jobs→CVs (no data).")
+        logger.debug("[MATCHING] Skipping jobs→CVs (no data)")
         return 0
 
     existing = _get_existing_match_keys()
@@ -223,7 +223,7 @@ def match_projects_to_profiles(project_ids: List[int] = None) -> int:
 
     profiles = fetch_all("accounts_userprofile", "id, user_id, embedding", not_null_col="embedding")
     if not projects or not profiles:
-        logger.info("[Matching] Skipping projects→profiles (no data).")
+        logger.debug("[MATCHING] Skipping projects→profiles (no data)")
         return 0
 
     existing = _get_existing_match_keys()
@@ -254,7 +254,7 @@ def match_cvs_to_all_jobs(cv_ids: List[int]) -> int:
     jobs = fetch_all("opportunities_job", "id, embedding", not_null_col="embedding")
 
     if not cvs or not jobs:
-        logger.info("[Matching] Skipping CVs→jobs (no data).")
+        logger.debug("[MATCHING] Skipping CVs→jobs (no data)")
         return 0
 
     existing = _get_existing_match_keys()
@@ -292,7 +292,7 @@ def match_profiles_to_all_projects(profile_ids: List[int]) -> int:
     )
 
     if not profiles or not projects:
-        logger.info("[Matching] Skipping profiles→projects (no data).")
+        logger.debug("[MATCHING] Skipping profiles→projects (no data)")
         return 0
 
     existing = _get_existing_match_keys()
@@ -318,9 +318,6 @@ def run_matching_pipeline() -> Dict:
 
     Called by the scheduler after every scraping cycle.
     """
-    logger.info("=" * 60)
-    logger.info("[Matching Pipeline] Starting full embedding + matching pipeline ...")
-
     from app.services.embedding_service import run_embedding_pipeline
     emb = run_embedding_pipeline()
 
@@ -331,19 +328,12 @@ def run_matching_pipeline() -> Dict:
 
     total = 0
 
-    # New jobs → all CVs
     if new_job_ids:
         total += match_jobs_to_cvs(new_job_ids)
-
-    # New projects → all profiles
     if new_project_ids:
         total += match_projects_to_profiles(new_project_ids)
-
-    # New CVs → all jobs
     if new_cv_ids:
         total += match_cvs_to_all_jobs(new_cv_ids)
-
-    # New profiles → all projects
     if new_profile_ids:
         total += match_profiles_to_all_projects(new_profile_ids)
 
@@ -357,7 +347,5 @@ def run_matching_pipeline() -> Dict:
         "total_new_matches": total,
     }
 
-    logger.info(f"[Matching Pipeline] Done — {total} new matches created.")
-    logger.info(f"[Matching Pipeline] Summary: {summary}")
-    logger.info("=" * 60)
+    logger.info(f"[MATCHING] Pipeline done — {total} new matches")
     return summary

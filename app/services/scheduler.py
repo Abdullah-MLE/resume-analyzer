@@ -9,70 +9,65 @@ from app.services.wuzzuf_scraper import fetch_wuzzuf_jobs
 from app.services.bayt_scraper import fetch_bayt_jobs
 from app.services.forasna_scraper import fetch_forasna_jobs
 
-logger = get_logger()
+logger = get_logger("scheduler")
 
 # Scheduler Configuration
 BASE_INTERVAL_MINUTES = 15
 MAX_INTERVAL_MINUTES = 60
 MULTIPLIER_IF_NO_DATA = 1.5
-NIGHT_INTERVAL_MINUTES = 120 # 2 hours
+NIGHT_INTERVAL_MINUTES = 120  # 2 hours
 
-# --- التحكم في وضع الليل (بتوقيت مصر) ---
-# تنسيق 24 ساعة (مثلاً 0 تعني 12 بليل، 6 تعني 6 الفجر)
-# إذا أردت أن يبدأ الساعة 11 مساءً وينتهي 6 صباحاً، اجعل البداية 23 والنهاية 6
-NIGHT_START_HOUR = 0  
-NIGHT_END_HOUR = 6    
+NIGHT_START_HOUR = 0
+NIGHT_END_HOUR = 6
 
 # Global state to stop the scheduler cleanly
 _is_running = False
 
+# ── All scrapers defined in one list for easy management ─────
+SCRAPERS = [
+    {"name": "Mostaql",       "func": fetch_mostaql_projects,       "kwargs": {"pages": 1, "per_page_limit": 25}},
+    {"name": "FreelanceYard", "func": fetch_freelanceyard_projects,  "kwargs": {"pages": 1, "per_page_limit": 25}},
+    {"name": "Elharefa",      "func": fetch_elharefa_projects,       "kwargs": {"pages": 1, "per_page_limit": 25}},
+    {"name": "Wuzzuf",        "func": fetch_wuzzuf_jobs,             "kwargs": {"pages": 1}},
+    {"name": "Bayt",          "func": fetch_bayt_jobs,               "kwargs": {"pages": 1}},
+    {"name": "Forasna",       "func": fetch_forasna_jobs,            "kwargs": {"pages": 1}},
+]
+
+
 async def run_scrapers():
-    """Run all scrapers sequentially or concurrently and return the total number of new items found."""
+    """Run all scrapers one-by-one. Each scraper is isolated —
+    if one crashes the others still run."""
     total_new_items = 0
-    
-    logger.info("Starting a new scraping cycle...")
-    
-    # We can run them sequentially to avoid killing the server/CPU, 
-    # since each scraper uses concurrent.futures internally.
-    try:
-        mostaql_data = await asyncio.to_thread(fetch_mostaql_projects, pages=1, per_page_limit=25)
-        total_new_items += len(mostaql_data)
-        logger.info(f"[Mostaql] +{len(mostaql_data)}")
 
-        freelanceyard_data = await asyncio.to_thread(fetch_freelanceyard_projects, pages=1, per_page_limit=25)
-        total_new_items += len(freelanceyard_data)
-        logger.info(f"[FreelanceYard] +{len(freelanceyard_data)}")
+    logger.info("━" * 50)
+    logger.info("[SCRAPING] Cycle started")
+    logger.info("━" * 50)
 
-        elharefa_data = await asyncio.to_thread(fetch_elharefa_projects, pages=1, per_page_limit=25)
-        total_new_items += len(elharefa_data)
-        logger.info(f"[Elharefa] +{len(elharefa_data)}")
+    for scraper in SCRAPERS:
+        name = scraper["name"]
+        try:
+            logger.info(f"[SCRAPING] ▶ {name} ...")
+            data = await asyncio.to_thread(scraper["func"], **scraper["kwargs"])
+            count = len(data) if data else 0
+            total_new_items += count
+            logger.info(f"[SCRAPING] ✓ {name} — {count} new items")
+        except Exception as e:
+            # ── THIS IS THE KEY FIX ──
+            # One scraper crashing does NOT stop the others.
+            logger.error(f"[SCRAPING] ✗ {name} — SKIPPED (error: {e})")
 
-        wuzzuf_data = await asyncio.to_thread(fetch_wuzzuf_jobs, pages=1)
-        total_new_items += len(wuzzuf_data)
-        logger.info(f"[Wuzzuf] +{len(wuzzuf_data)}")
-
-        bayt_data = await asyncio.to_thread(fetch_bayt_jobs, pages=1)
-        total_new_items += len(bayt_data)
-        logger.info(f"[Bayt] +{len(bayt_data)}")
-
-        forasna_data = await asyncio.to_thread(fetch_forasna_jobs, pages=1)
-        total_new_items += len(forasna_data)
-        logger.info(f"[Forasna] +{len(forasna_data)}")
-        
-    except Exception as e:
-        logger.error(f"Error during scraping cycle: {e}")
-        
+    logger.info("━" * 50)
+    logger.info(f"[SCRAPING] Cycle done — {total_new_items} total new items")
+    logger.info("━" * 50)
     return total_new_items
+
 
 async def intelligent_scraper_loop():
     global _is_running
     _is_running = True
     current_interval = BASE_INTERVAL_MINUTES
 
-    logger.info("Intelligent Scraper Loop started.")
-    print("🤖 [Scraper] System started. Check 'scraper.log' for details.")
-
-    # Small delay before starting the first cycle to allow the server to fully start
+    logger.info("System started. Waiting 10s for server to be ready ...")
     await asyncio.sleep(10)
 
     from zoneinfo import ZoneInfo
@@ -80,57 +75,59 @@ async def intelligent_scraper_loop():
 
     while _is_running:
         now = datetime.now(egypt_timezone)
-        
-        # Night mode override
+
+        # Night mode
         is_night = False
         if NIGHT_START_HOUR < NIGHT_END_HOUR:
             is_night = NIGHT_START_HOUR <= now.hour < NIGHT_END_HOUR
-        else: # Handle wrapping around midnight (e.g., 23 to 6)
+        else:
             is_night = now.hour >= NIGHT_START_HOUR or now.hour < NIGHT_END_HOUR
-            
+
         if is_night:
             sleep_time_minutes = NIGHT_INTERVAL_MINUTES
-            logger.info(f"Night mode active. Sleeping for {sleep_time_minutes} minutes.")
-            print(f"🌙 [Scraper] Night mode. Next run in {sleep_time_minutes} min.")
+            logger.info(f"🌙 Night mode — sleeping {sleep_time_minutes} min")
         else:
-            # Run Scrapers
-            print("⏳ [Scraper] Cycle started...")
+            # ────────────────── SCRAPING ──────────────────
             new_items_count = await run_scrapers()
-            
+
             if new_items_count > 0:
                 current_interval = BASE_INTERVAL_MINUTES
-                logger.info(f"Cycle Done: {new_items_count} new. Next: {current_interval}m.")
-                print(f"✅ [Scraper] Cycle finished. Found {new_items_count} new items. Next in {current_interval} min.")
             else:
                 current_interval = min(current_interval * MULTIPLIER_IF_NO_DATA, MAX_INTERVAL_MINUTES)
-                logger.info(f"Cycle Done: 0 new. Next: {current_interval:.1f}m.")
-                print(f"💤 [Scraper] Cycle finished. No new items. Next in {current_interval:.1f} min.")
 
-            # ── Embedding + Matching pipeline (runs every cycle) ──
+            # ────────────────── EMBEDDING + MATCHING ──────
             try:
-                print("🧠 [Matching] Running embedding & matching pipeline ...")
+                logger.info("━" * 50)
+                logger.info("[EMBEDDING] Starting pipeline ...")
+                logger.info("━" * 50)
                 from app.services.matching_service import run_matching_pipeline
-                pipeline_result = await asyncio.to_thread(run_matching_pipeline)
-                total_matches = pipeline_result.get("total_new_matches", 0)
-                logger.info(f"[Matching Pipeline] Result: {pipeline_result}")
-                print(f"🧠 [Matching] Pipeline done — {total_matches} new matches.")
+                result = await asyncio.to_thread(run_matching_pipeline)
+                total_matches = result.get("total_new_matches", 0)
+                emb = result.get("embeddings", {})
+                logger.info("━" * 50)
+                logger.info(
+                    f"[PIPELINE DONE] "
+                    f"Embedded: {emb.get('jobs',0)} jobs, {emb.get('projects',0)} projects, "
+                    f"{emb.get('cvs',0)} CVs, {emb.get('profiles',0)} profiles | "
+                    f"New matches: {total_matches}"
+                )
+                logger.info("━" * 50)
             except Exception as e:
-                logger.error(f"[Matching Pipeline] Error: {e}")
-                print(f"❌ [Matching] Pipeline error: {e}")
+                logger.error(f"[PIPELINE ERROR] {e}")
 
             sleep_time_minutes = current_interval
+            logger.info(f"💤 Next cycle in {sleep_time_minutes:.0f} min")
 
-
-        # Sleep, but break it into chunks so we can exit cleanly if _is_running becomes False
+        # Sleep in chunks so we can exit cleanly
         sleep_seconds = sleep_time_minutes * 60
         chunk_size = 5
         for _ in range(int(sleep_seconds / chunk_size)):
             if not _is_running:
                 break
             await asyncio.sleep(chunk_size)
-            
-    logger.info("Intelligent Scraper Loop stopped.")
-    print("🛑 [Scraper] System stopped.")
+
+    logger.info("System stopped.")
+
 
 def stop_scheduler():
     global _is_running

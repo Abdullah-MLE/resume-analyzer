@@ -1,7 +1,10 @@
 from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
 import requests
-import concurrent.futures
+import time
+from app.core.logger import get_logger
+
+_logger = get_logger("scraper")
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -19,7 +22,7 @@ def _fetch_html(url: str) -> Optional[str]:
         r.encoding = "utf-8"
         return r.text
     except Exception as e:
-        print(f"[forasna] error fetching {url}: {e}")
+        _logger.warning(f"  Forasna: fetch error: {type(e).__name__}")
         return None
 
 
@@ -111,27 +114,28 @@ def fetch_forasna_jobs(pages: int = 1) -> List[Dict[str, str]]:
         sep = "&" if "?" in base else "?"
         return f"{base}{sep}page={page}"
 
-    page_urls = [build_page_url(LIST_URL, p) for p in range(1, pages + 1)]
     all_jobs: List[Dict[str, str]] = []
 
-    max_workers = min(5, pages)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_url = {executor.submit(_scrape_page, url): url for url in page_urls}
-        for future in concurrent.futures.as_completed(future_to_url):
-            try:
-                results = future.result()
-                
-                # Check DB
-                all_urls = [r["url"] for r in results if r.get("url")]
-                existing_urls = get_existing_urls(all_urls, "opportunities_job")
-                
-                for item in results:
-                    if item["url"] not in existing_urls:
-                        item["source_platform"] = "Forasna"
-                        all_jobs.append(item)
-                        save_job(item)
-                        
-            except Exception as exc:
-                print(f"[forasna] error: {exc}")
+    for p in range(1, pages + 1):
+        url = build_page_url(LIST_URL, p)
+        try:
+            results = _scrape_page(url)
+            if not results:
+                continue
+
+            all_urls = [r["url"] for r in results if r.get("url")]
+            existing_urls = get_existing_urls(all_urls, "opportunities_job")
+
+            for item in results:
+                if item["url"] not in existing_urls:
+                    item["source_platform"] = "Forasna"
+                    all_jobs.append(item)
+                    save_job(item)
+
+        except Exception as exc:
+            _logger.warning(f"  Forasna: page {p} error: {type(exc).__name__}")
+
+        if p < pages:
+            time.sleep(2)
 
     return all_jobs

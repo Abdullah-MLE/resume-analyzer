@@ -1,13 +1,29 @@
 from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
-from playwright.sync_api import sync_playwright
 import os
-import random
+from app.core.logger import get_logger
+
+logger = get_logger("scraper")
 
 BASE_URL = "https://www.bayt.com"
 DEFAULT_URL = "https://www.bayt.com/en/egypt/jobs/"
 
-def _get_page_html(url: str, browser, proxy_config=None) -> Optional[str]:
+
+def _check_playwright_available() -> bool:
+    """Check if Playwright + Chromium are installed before trying to launch."""
+    try:
+        from playwright.sync_api import sync_playwright
+        # Quick check: just see if the module loads fine
+        return True
+    except ImportError:
+        logger.error("  Bayt: playwright is not installed (pip install playwright)")
+        return False
+    except Exception as e:
+        logger.error(f"  Bayt: playwright check failed: {type(e).__name__}")
+        return False
+
+
+def _get_page_html(url: str, browser) -> Optional[str]:
     """Open a URL with the shared Playwright browser and return HTML after JS renders."""
     try:
         context = browser.new_context(
@@ -25,6 +41,7 @@ def _get_page_html(url: str, browser, proxy_config=None) -> Optional[str]:
         context.close()
         return html
     except Exception as e:
+        logger.warning(f"  Bayt: browser page error: {type(e).__name__}")
         return None
 
 def _extract_card_details(card) -> Optional[Dict[str, str]]:
@@ -104,29 +121,46 @@ from app.services.scraper_utils import get_random_proxy
 def fetch_bayt_jobs(pages: int = 1, list_url: str = DEFAULT_URL) -> List[Dict[str, str]]:
     """
     Fetches Bayt jobs using a headless Chromium browser via Playwright.
-    Pages are scraped sequentially to keep resource usage manageable.
+    Gracefully returns empty list if Playwright/Chromium is not available.
     """
+    # ── Guard: check Playwright is usable before doing anything ──
+    if not _check_playwright_available():
+        return []
+
     all_jobs: List[Dict[str, str]] = []
-    with sync_playwright() as p:
-        proxy_info = get_random_proxy()
-        proxy_config = None
-        if proxy_info and "http" in proxy_info:
-            proxy_config = {"server": proxy_info["http"]}
-                
-        browser = p.chromium.launch(headless=True, proxy=proxy_config)
-        for page_num in range(1, pages + 1):
-            url = _build_url(list_url, page_num)
-            results = _scrape_listing_page(url, browser)
-            
-            # Check DB
-            all_urls = [r["url"] for r in results if r.get("url")]
-            existing_urls = get_existing_urls(all_urls, "opportunities_job")
-            
-            for item in results:
-                if item["url"] not in existing_urls:
-                    item["source_platform"] = "Bayt"
-                    all_jobs.append(item)
-                    save_job(item)
-                    
-        browser.close()
+
+    try:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            proxy_info = get_random_proxy()
+            proxy_config = None
+            if proxy_info and "http" in proxy_info:
+                proxy_config = {"server": proxy_info["http"]}
+
+            try:
+                browser = p.chromium.launch(headless=True, proxy=proxy_config)
+            except Exception as e:
+                logger.error(f"  Bayt: Browser launch failed: {type(e).__name__} — {e}")
+                return []
+
+            for page_num in range(1, pages + 1):
+                url = _build_url(list_url, page_num)
+                results = _scrape_listing_page(url, browser)
+
+                # Check DB
+                all_urls = [r["url"] for r in results if r.get("url")]
+                existing_urls = get_existing_urls(all_urls, "opportunities_job")
+
+                for item in results:
+                    if item["url"] not in existing_urls:
+                        item["source_platform"] = "Bayt"
+                        all_jobs.append(item)
+                        save_job(item)
+
+            browser.close()
+
+    except Exception as e:
+        logger.error(f"  Bayt: Playwright error: {type(e).__name__} — {e}")
+
     return all_jobs
