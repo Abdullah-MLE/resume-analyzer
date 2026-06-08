@@ -1,8 +1,8 @@
 __pycache__
 .venv
 .env
-etc/
-*.json
+app/etc/secrets/
 *.log
+*.json
 !app/api/models.py
 !package.json

@@ -9,10 +9,14 @@ RUN apt-get update && apt-get install -y \
 
 # Install Python dependencies
 COPY requirements.txt .
+# For the API, we only need CPU PyTorch to save space on deployment (if applicable)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application code
 COPY . .
+
+# Set environment variable to indicate this is the API service
+ENV SERVICE_TYPE=api
 
 # Expose the port
 EXPOSE 8000

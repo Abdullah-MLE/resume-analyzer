@@ -55,7 +55,6 @@ async def optimize_ats(payload: OptimizeATSRequest):
         ats_score=score
     )
 
-
 @router.post("/optimiz/user_interaction", response_model=UserInteractResponse)
 async def user_interact(payload: UserInteractRequest):
     """Modifies CV based on user requests"""

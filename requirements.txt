@@ -1,8 +1,13 @@
 fastapi
 uvicorn
 pydantic
+sentence-transformers
 python-multipart
-python-dotenv
-supabase
+requests
+beautifulsoup4
+playwright
 google-genai
+python-dotenv
 Pillow
+supabase
+pysocks
