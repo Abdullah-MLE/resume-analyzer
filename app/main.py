@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
 import os
 
@@ -10,7 +9,9 @@ load_dotenv()
 from app.api.routers.scraping import router as scraping_router
 from app.api.routers.core import router as core_router
 from app.api.routers.cv import router as cv_router
+from app.core.logger import get_logger
 
+logger = get_logger("main")
 
 import asyncio
 from app.services.scheduler import intelligent_scraper_loop, stop_scheduler
@@ -19,17 +20,19 @@ SERVICE_TYPE = os.getenv("SERVICE_TYPE", "both")  # Can be 'api', 'scraper', or 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Conditionally load the heavy ML model only if needed
+    # Load the SentenceTransformer model via centralized embedding_service
+    # (singleton — loaded once, reused everywhere)
     if SERVICE_TYPE in ["api", "both"]:
-        print("Loading SentenceTransformer model...")
-        model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
-        app.state.model = model
-        print("Model loaded successfully.")
+        logger.info("Pre-loading SentenceTransformer model ...")
+        from app.services.embedding_service import get_model
+        model = get_model()
+        app.state.model = model  # keep backward compat for analyzer.py
+        logger.info("Model ready.")
     
     scraper_task = None
     # Conditionally start the background scraper
     if SERVICE_TYPE in ["scraper", "both"]:
-        print("Starting intelligent scraper loop...")
+        logger.info("Starting intelligent scraper loop ...")
         scraper_task = asyncio.create_task(intelligent_scraper_loop())
     
     yield
@@ -60,6 +63,9 @@ app.include_router(cv_router)
 if __name__ == "__main__":
     if SERVICE_TYPE == "scraper":
         print("Running in Standalone Scraper Mode (No Web Server)...")
+        # Pre-load the model so embedding works during scraping
+        from app.services.embedding_service import get_model
+        get_model()
         # Run the scraper loop directly, no uvicorn needed
         asyncio.run(intelligent_scraper_loop())
     else:

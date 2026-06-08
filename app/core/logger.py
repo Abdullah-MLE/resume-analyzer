@@ -1,27 +1,60 @@
 import logging
-import os
+import sys
 
-# Create a logger
-logger = logging.getLogger("scraper_system")
-logger.setLevel(logging.INFO)
+# ============================================================
+# Centralized Logger for the ATS System
+# ============================================================
+# Log File: system.log (contains DEBUG and above — everything)
+# Console:  INFO and above (so you see important events live)
+#
+# Usage:
+#   from app.core.logger import get_logger
+#   logger = get_logger("embedding")   # named child logger
+#   logger = get_logger()              # root system logger
+# ============================================================
 
-# Formatter
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+_ROOT_NAME = "ats_system"
+_LOG_FILE = "system.log"
+_is_configured = False
 
-# File Handler (Writes everything INFO and above to scraper.log)
-file_handler = logging.FileHandler('scraper.log', encoding='utf-8')
-file_handler.setLevel(logging.INFO)
-file_handler.setFormatter(formatter)
 
-# Console Handler (Only writes WARNING and ERROR to the terminal to avoid spam)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.WARNING)
-console_handler.setFormatter(formatter)
+def _configure_root():
+    """Configure the root logger once."""
+    global _is_configured
+    if _is_configured:
+        return
+    _is_configured = True
 
-# Prevent duplicate logs if module is reloaded
-if not logger.handlers:
-    logger.addHandler(file_handler)
-    logger.addHandler(console_handler)
+    root = logging.getLogger(_ROOT_NAME)
+    root.setLevel(logging.DEBUG)
 
-def get_logger():
-    return logger
+    # ---- Console Handler (INFO+) ----
+    console = logging.StreamHandler(sys.stdout)
+    console.setLevel(logging.INFO)
+    console.setFormatter(logging.Formatter(
+        "%(asctime)s │ %(levelname)-7s │ %(message)s",
+        datefmt="%H:%M:%S",
+    ))
+
+    # ---- File Handler (DEBUG+) ----
+    file = logging.FileHandler(_LOG_FILE, encoding="utf-8")
+    file.setLevel(logging.DEBUG)
+    file.setFormatter(logging.Formatter(
+        "%(asctime)s │ %(levelname)-7s │ %(name)s │ %(funcName)s:%(lineno)d │ %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    ))
+
+    root.addHandler(console)
+    root.addHandler(file)
+
+
+def get_logger(name: str = None):
+    """Return a logger.
+
+    - ``get_logger()``            → root ``ats_system`` logger
+    - ``get_logger("embedding")`` → child ``ats_system.embedding`` logger
+    """
+    _configure_root()
+    if name:
+        return logging.getLogger(f"{_ROOT_NAME}.{name}")
+    return logging.getLogger(_ROOT_NAME)

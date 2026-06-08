@@ -105,8 +105,21 @@ async def intelligent_scraper_loop():
                 current_interval = min(current_interval * MULTIPLIER_IF_NO_DATA, MAX_INTERVAL_MINUTES)
                 logger.info(f"Cycle Done: 0 new. Next: {current_interval:.1f}m.")
                 print(f"💤 [Scraper] Cycle finished. No new items. Next in {current_interval:.1f} min.")
-                
+
+            # ── Embedding + Matching pipeline (runs every cycle) ──
+            try:
+                print("🧠 [Matching] Running embedding & matching pipeline ...")
+                from app.services.matching_service import run_matching_pipeline
+                pipeline_result = await asyncio.to_thread(run_matching_pipeline)
+                total_matches = pipeline_result.get("total_new_matches", 0)
+                logger.info(f"[Matching Pipeline] Result: {pipeline_result}")
+                print(f"🧠 [Matching] Pipeline done — {total_matches} new matches.")
+            except Exception as e:
+                logger.error(f"[Matching Pipeline] Error: {e}")
+                print(f"❌ [Matching] Pipeline error: {e}")
+
             sleep_time_minutes = current_interval
+
 
         # Sleep, but break it into chunks so we can exit cleanly if _is_running becomes False
         sleep_seconds = sleep_time_minutes * 60

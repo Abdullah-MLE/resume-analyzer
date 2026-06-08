@@ -3,7 +3,7 @@ from datetime import datetime
 from app.core.database import get_supabase
 from app.core.logger import get_logger
 
-logger = get_logger()
+logger = get_logger("db")
 
 def insert_skills_and_get_ids(skills_str: str) -> List[int]:
     """
@@ -159,3 +159,137 @@ def get_existing_urls(urls: List[str], table_name: str) -> List[str]:
     except Exception as e:
         logger.error(f"[db_services] Error checking existing URLs in {table_name}: {e}")
         return []
+
+
+# ═══════════════════════════════════════════════════════════════
+#  Embedding & Matching Helpers
+# ═══════════════════════════════════════════════════════════════
+
+def fetch_all(
+    table_name: str,
+    select_columns: str,
+    is_null_col: str = None,
+    not_null_col: str = None,
+    eq_filters: Dict = None,
+    page_size: int = 1000,
+) -> List[Dict]:
+    """Paginated fetch from any Supabase table.
+
+    Filters:
+        is_null_col  – column IS NULL
+        not_null_col – column IS NOT NULL
+        eq_filters   – {column: value, …} equality filters
+    """
+    supabase = get_supabase()
+    if not supabase:
+        return []
+
+    all_data: List[Dict] = []
+    offset = 0
+
+    while True:
+        try:
+            query = supabase.table(table_name).select(select_columns)
+            if is_null_col:
+                query = query.is_(is_null_col, "null")
+            if not_null_col:
+                query = query.not_.is_(not_null_col, "null")
+            if eq_filters:
+                for col, val in eq_filters.items():
+                    query = query.eq(col, val)
+            response = query.range(offset, offset + page_size - 1).execute()
+        except Exception as e:
+            logger.error(f"[db_services] fetch_all({table_name}) error at offset {offset}: {e}")
+            break
+
+        if not response.data:
+            break
+
+        all_data.extend(response.data)
+        if len(response.data) < page_size:
+            break
+        offset += page_size
+
+    return all_data
+
+
+def fetch_by_ids(
+    table_name: str,
+    select_columns: str,
+    ids: List[int],
+    not_null_col: str = None,
+    chunk_size: int = 100,
+) -> List[Dict]:
+    """Fetch rows by a list of IDs (chunked to avoid PostgREST limits)."""
+    supabase = get_supabase()
+    if not supabase or not ids:
+        return []
+
+    all_data: List[Dict] = []
+    for i in range(0, len(ids), chunk_size):
+        chunk = ids[i : i + chunk_size]
+        try:
+            query = supabase.table(table_name).select(select_columns).in_("id", chunk)
+            if not_null_col:
+                query = query.not_.is_(not_null_col, "null")
+            resp = query.execute()
+            if resp.data:
+                all_data.extend(resp.data)
+        except Exception as e:
+            logger.error(f"[db_services] fetch_by_ids({table_name}) error: {e}")
+    return all_data
+
+
+def update_embedding(table_name: str, row_id: int, embedding_list: List[float]) -> bool:
+    """Write an embedding vector into the ``embedding`` column for one row."""
+    supabase = get_supabase()
+    if not supabase:
+        return False
+    try:
+        supabase.table(table_name).update(
+            {"embedding": embedding_list}
+        ).eq("id", row_id).execute()
+        return True
+    except Exception as e:
+        logger.error(f"[db_services] update_embedding({table_name}, id={row_id}): {e}")
+        return False
+
+
+def get_all_skill_names() -> Dict[int, str]:
+    """Return {skill_id: skill_name} for every skill in accounts_skill."""
+    supabase = get_supabase()
+    if not supabase:
+        return {}
+    try:
+        data = fetch_all("accounts_skill", "id, name")
+        return {row["id"]: row["name"] for row in data}
+    except Exception as e:
+        logger.error(f"[db_services] get_all_skill_names error: {e}")
+        return {}
+
+
+def get_skills_map(junction_table: str, fk_column: str) -> Dict[int, List[str]]:
+    """Build {item_id: [skill_name, …]} from a junction table.
+
+    Example::
+
+        get_skills_map("opportunities_job_required_skills", "job_id")
+        → {12: ["Python", "SQL"], 17: ["React"], …}
+    """
+    supabase = get_supabase()
+    if not supabase:
+        return {}
+    try:
+        skill_names = get_all_skill_names()
+        data = fetch_all(junction_table, f"{fk_column}, skill_id")
+        result: Dict[int, List[str]] = {}
+        for row in data:
+            item_id = row[fk_column]
+            name = skill_names.get(row["skill_id"], "")
+            if name:
+                result.setdefault(item_id, []).append(name)
+        return result
+    except Exception as e:
+        logger.error(f"[db_services] get_skills_map({junction_table}) error: {e}")
+        return {}
+
