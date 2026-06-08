@@ -16,8 +16,12 @@ BASE_INTERVAL_MINUTES = 15
 MAX_INTERVAL_MINUTES = 60
 MULTIPLIER_IF_NO_DATA = 1.5
 NIGHT_INTERVAL_MINUTES = 120 # 2 hours
-NIGHT_START_HOUR = 0  # 12:00 AM
-NIGHT_END_HOUR = 6    # 6:00 AM
+
+# --- التحكم في وضع الليل (بتوقيت مصر) ---
+# تنسيق 24 ساعة (مثلاً 0 تعني 12 بليل، 6 تعني 6 الفجر)
+# إذا أردت أن يبدأ الساعة 11 مساءً وينتهي 6 صباحاً، اجعل البداية 23 والنهاية 6
+NIGHT_START_HOUR = 0  
+NIGHT_END_HOUR = 6    
 
 # Global state to stop the scheduler cleanly
 _is_running = False
@@ -71,11 +75,20 @@ async def intelligent_scraper_loop():
     # Small delay before starting the first cycle to allow the server to fully start
     await asyncio.sleep(10)
 
+    from zoneinfo import ZoneInfo
+    egypt_timezone = ZoneInfo("Africa/Cairo")
+
     while _is_running:
-        now = datetime.now()
+        now = datetime.now(egypt_timezone)
         
         # Night mode override
-        if NIGHT_START_HOUR <= now.hour < NIGHT_END_HOUR:
+        is_night = False
+        if NIGHT_START_HOUR < NIGHT_END_HOUR:
+            is_night = NIGHT_START_HOUR <= now.hour < NIGHT_END_HOUR
+        else: # Handle wrapping around midnight (e.g., 23 to 6)
+            is_night = now.hour >= NIGHT_START_HOUR or now.hour < NIGHT_END_HOUR
+            
+        if is_night:
             sleep_time_minutes = NIGHT_INTERVAL_MINUTES
             logger.info(f"Night mode active. Sleeping for {sleep_time_minutes} minutes.")
             print(f"🌙 [Scraper] Night mode. Next run in {sleep_time_minutes} min.")
