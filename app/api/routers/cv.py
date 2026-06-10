@@ -59,8 +59,8 @@ async def optimize_ats(payload: OptimizeATSRequest):
 async def user_interact(payload: UserInteractRequest):
     """Modifies CV based on user requests"""
     try:
-        cv = await cv_service.interact_with_cv(payload.cv, payload.user_query)
-        return UserInteractResponse(modified_cv=cv, ai_message="CV updated successfully.")
+        result = await cv_service.interact_with_cv(payload.cv, payload.user_query)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

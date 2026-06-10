@@ -40,7 +40,7 @@ Current CV:
 User Request:
 {query}
 
-Return the updated CV in the requested JSON format. Ensure the entire updated CV remains in English."""
+Return a JSON object containing the updated CV and an 'ai_message' responding to the user. Ensure the entire updated CV remains strictly in English. If the user request is in Arabic, the AI message MUST be in Arabic, but all CV fields must remain in English."""
 
 def get_proposal_prompt(profile: str, project: str) -> str:
     return f"""Write a professional and persuasive project proposal based on the user's profile and the project details.

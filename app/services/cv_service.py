@@ -11,7 +11,7 @@ from app.core.prompts import (
     get_proposal_prompt,
     get_keywords_prompt
 )
-from app.api.models import CVSchema, ProposalResponse, AIKeywordsResponse
+from app.api.models import CVSchema, ProposalResponse, AIKeywordsResponse, UserInteractResponse
 from app.core.logger import get_logger
 
 load_dotenv()
@@ -84,13 +84,13 @@ async def optimize_cv_for_job(base_cv: CVSchema, target_job: str) -> CVSchema:
         logger.error(f"[LangChain] optimize_cv_for_job FAILED: {str(e)}")
         raise Exception(f"AI Generation Failed: {str(e)}")
 
-async def interact_with_cv(cv: CVSchema, query: str) -> CVSchema:
+async def interact_with_cv(cv: CVSchema, query: str) -> UserInteractResponse:
     logger.info(f"[LangChain] interact_with_cv — query: {query[:100]}")
     system_prompt = get_cv_system_prompt()
     user_prompt = get_cv_interaction_prompt(json.dumps(cv.model_dump(by_alias=True)), query)
     
     llm = get_llm()
-    structured_llm = llm.with_structured_output(CVSchema)
+    structured_llm = llm.with_structured_output(UserInteractResponse)
     
     try:
         result = await structured_llm.ainvoke([
