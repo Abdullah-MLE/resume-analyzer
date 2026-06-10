@@ -171,6 +171,7 @@ def fetch_all(
     is_null_col: str = None,
     not_null_col: str = None,
     eq_filters: Dict = None,
+    gte_filters: Dict = None,
     page_size: int = 1000,
 ) -> List[Dict]:
     """Paginated fetch from any Supabase table.
@@ -179,6 +180,7 @@ def fetch_all(
         is_null_col  – column IS NULL
         not_null_col – column IS NOT NULL
         eq_filters   – {column: value, …} equality filters
+        gte_filters  – {column: value, …} greater-than-or-equal filters
     """
     supabase = get_supabase()
     if not supabase:
@@ -197,6 +199,9 @@ def fetch_all(
             if eq_filters:
                 for col, val in eq_filters.items():
                     query = query.eq(col, val)
+            if gte_filters:
+                for col, val in gte_filters.items():
+                    query = query.gte(col, val)
             response = query.range(offset, offset + page_size - 1).execute()
         except Exception as e:
             logger.error(f"[db_services] fetch_all({table_name}) error at offset {offset}: {e}")

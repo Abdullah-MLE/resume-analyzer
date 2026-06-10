@@ -15,7 +15,7 @@ Flow (called after every scraping cycle):
 import json
 import numpy as np
 from typing import List, Dict, Set, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.core.logger import get_logger
 
@@ -149,6 +149,9 @@ def _match_opportunities_to_users(
             score = float(np.clip(sim[i][j], 0.0, 1.0))
             score_pct = round(score * 100, 2)
 
+            if score_pct < 50.0:
+                continue
+
             o_skills = set(opp_skills_map.get(opp["id"], []))
             u_skills = set(user_skills_map.get(usr[user_skill_key], []))
             matched = sorted(o_skills & u_skills)
@@ -250,8 +253,14 @@ def match_cvs_to_all_jobs(cv_ids: List[int]) -> int:
     if not cv_ids:
         return 0
 
+    cutoff_date = (datetime.now() - timedelta(days=30)).isoformat()
+
     cvs = fetch_by_ids("documents_cv", "id, user_id, embedding", cv_ids, not_null_col="embedding")
-    jobs = fetch_all("opportunities_job", "id, embedding", not_null_col="embedding")
+    jobs = fetch_all(
+        "opportunities_job", "id, embedding", 
+        not_null_col="embedding",
+        gte_filters={"posted_date": cutoff_date}
+    )
 
     if not cvs or not jobs:
         logger.debug("[MATCHING] Skipping CVs→jobs (no data)")
@@ -282,6 +291,8 @@ def match_profiles_to_all_projects(profile_ids: List[int]) -> int:
     if not profile_ids:
         return 0
 
+    cutoff_date = (datetime.now() - timedelta(days=30)).isoformat()
+
     profiles = fetch_by_ids(
         "accounts_userprofile", "id, user_id, embedding",
         profile_ids, not_null_col="embedding",
@@ -289,6 +300,7 @@ def match_profiles_to_all_projects(profile_ids: List[int]) -> int:
     projects = fetch_all(
         "opportunities_freelanceproject", "id, embedding",
         not_null_col="embedding",
+        gte_filters={"posted_date": cutoff_date}
     )
 
     if not profiles or not projects:
