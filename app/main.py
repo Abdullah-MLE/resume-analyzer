@@ -14,7 +14,7 @@ from app.core.logger import get_logger
 logger = get_logger("main")
 
 import asyncio
-from app.services.scheduler import intelligent_scraper_loop, stop_scheduler
+from app.scrapers.scheduler import intelligent_scraper_loop, stop_scheduler
 
 SERVICE_TYPE = os.getenv("SERVICE_TYPE", "both")  # Can be 'api', 'scraper', or 'both'
 

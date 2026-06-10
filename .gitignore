@@ -6,3 +6,4 @@ app/etc/secrets/
 *.json
 !app/api/models.py
 !package.json
+skills

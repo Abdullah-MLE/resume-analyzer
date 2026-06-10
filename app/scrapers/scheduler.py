@@ -2,12 +2,12 @@ import asyncio
 from datetime import datetime
 from app.core.logger import get_logger
 
-from app.services.mostaql_scraper import fetch_mostaql_projects
-from app.services.freelanceyard_scraper import fetch_freelanceyard_projects
-from app.services.elharefa_scraper import fetch_elharefa_projects
-from app.services.wuzzuf_scraper import fetch_wuzzuf_jobs
-from app.services.bayt_scraper import fetch_bayt_jobs
-from app.services.forasna_scraper import fetch_forasna_jobs
+from app.scrapers.mostaql_scraper import fetch_mostaql_projects
+from app.scrapers.freelanceyard_scraper import fetch_freelanceyard_projects
+from app.scrapers.elharefa_scraper import fetch_elharefa_projects
+from app.scrapers.wuzzuf_scraper import fetch_wuzzuf_jobs
+from app.scrapers.bayt_scraper import fetch_bayt_jobs
+from app.scrapers.forasna_scraper import fetch_forasna_jobs
 
 logger = get_logger("scheduler")
 

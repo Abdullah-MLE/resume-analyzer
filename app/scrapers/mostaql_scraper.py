@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
-from app.services.scraper_utils import fetch_html, orchestrate_scraping
+from app.scrapers.scraper_utils import fetch_html, orchestrate_scraping
 
 def extract_project_links(page_url: str, limit: int = 25) -> List[str]:
     html = fetch_html(page_url)

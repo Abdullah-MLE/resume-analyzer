@@ -1,5 +1,5 @@
 from typing import List, Dict
-from app.services.scraper_utils import fetch_html
+from app.scrapers.scraper_utils import fetch_html
 from app.core.logger import get_logger
 import requests
 

@@ -116,7 +116,7 @@ def _build_url(base: str, page: int) -> str:
     return f"{base}{sep}page={page}"
 
 from app.services.db_services import save_job, get_existing_urls
-from app.services.scraper_utils import get_random_proxy
+from app.scrapers.scraper_utils import get_random_proxy
 
 def fetch_bayt_jobs(pages: int = 1, list_url: str = DEFAULT_URL) -> List[Dict[str, str]]:
     """

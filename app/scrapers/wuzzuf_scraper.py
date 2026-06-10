@@ -1,6 +1,6 @@
 from bs4 import BeautifulSoup
 from typing import List, Dict, Optional
-from app.services.scraper_utils import fetch_html, orchestrate_scraping
+from app.scrapers.scraper_utils import fetch_html, orchestrate_scraping
 
 BASE_URL = "https://wuzzuf.net"
 DEFAULT_URL = "https://wuzzuf.net/a/IT-Software-Development-Jobs-in-Egypt?ref=browse-jobs"

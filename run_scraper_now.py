@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-from app.services.scheduler import run_scrapers
+from app.scrapers.scheduler import run_scrapers
 
 async def manual_run():
     print("🚀 [Manual Run] Starting scrapers manually (ignoring night mode)...")
