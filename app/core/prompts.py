@@ -7,15 +7,17 @@ STRICT RULES:
 2. DO NOT use markdown symbols like ### or ***.
 3. Keep descriptions professional, impactful, and ATS-friendly (use action verbs).
 4. For missing information, use empty strings "" or empty lists [].
-5. Ensure dates are consistent and well-formatted."""
+5. Ensure dates are consistent and well-formatted.
+6. ALL content in the CV, including skills, descriptions, and titles, MUST be strictly in English."""
 
 def get_cv_build_prompt(raw_text: str) -> str:
     return f"""Extract and organize the following raw text into a professional CV structure.
+Translate any non-English text to English.
 Raw Text:
 {raw_text}
 
 Analyze the text carefully, identifying personal details, work experience, education, and skills. 
-Format it strictly into the requested JSON schema."""
+Format it strictly into the requested JSON schema. All output must be in English."""
 
 def get_cv_job_optimize_prompt(base_cv: str, target_job: str) -> str:
     return f"""Tailor the following CV to perfectly match the target job description. 
@@ -27,7 +29,7 @@ Base CV Data:
 Target Job Description:
 {target_job}
 
-Return the complete modified CV in the requested JSON format."""
+Return the complete modified CV in the requested JSON format. Ensure all content, including any newly added skills or descriptions, is in English."""
 
 def get_cv_interaction_prompt(cv: str, query: str) -> str:
     return f"""Update the following CV based on the user's specific request.
@@ -38,12 +40,16 @@ Current CV:
 User Request:
 {query}
 
-Return the updated CV in the requested JSON format."""
+Return the updated CV in the requested JSON format. Ensure the entire updated CV remains in English."""
 
 def get_proposal_prompt(profile: str, project: str) -> str:
     return f"""Write a professional and persuasive project proposal based on the user's profile and the project details.
 The proposal should be concise, professional, and highlight why the user is the best fit for the project.
 DO NOT use any markdown symbols (like #, *, -) in the text.
+
+CRITICAL INSTRUCTION: Write the proposal in the EXACT SAME LANGUAGE as the Project Details. 
+- If the Project Details are written in Arabic, the proposal MUST be in Arabic.
+- If the Project Details are written in English, the proposal MUST be in English.
 
 User Profile:
 {profile}
@@ -51,10 +57,11 @@ User Profile:
 Project Details:
 {project}
 
-Return only the final proposal text."""
+Return only the final proposal text in the correct language."""
 
 def get_keywords_prompt(cv_so_far: str) -> str:
     return f"""Based on the current CV content, suggest 5-10 high-impact, ATS-friendly keywords or skills that should be added to improve visibility.
+Ensure all recommended keywords and skills are in English.
 
 CV Content:
 {cv_so_far}
