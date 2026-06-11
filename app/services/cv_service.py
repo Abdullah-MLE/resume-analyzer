@@ -1,5 +1,9 @@
 import os
 import json
+import base64
+import io
+import fitz
+import docx
 from dotenv import load_dotenv
 from langchain_google_vertexai import ChatVertexAI
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -11,7 +15,7 @@ from app.core.prompts import (
     get_proposal_prompt,
     get_keywords_prompt
 )
-from app.api.models import CVSchema, ProposalResponse, AIKeywordsResponse, UserInteractResponse
+from app.api.models import CVSchema, ProposalResponse, AIKeywordsResponse, UserInteractResponse, AIInteractDecision
 from app.core.logger import get_logger
 
 load_dotenv()
@@ -84,13 +88,13 @@ async def optimize_cv_for_job(base_cv: CVSchema, target_job: str) -> CVSchema:
         logger.error(f"[LangChain] optimize_cv_for_job FAILED: {str(e)}")
         raise Exception(f"AI Generation Failed: {str(e)}")
 
-async def interact_with_cv(cv: CVSchema, query: str) -> UserInteractResponse:
+async def interact_with_cv(cv: CVSchema, query: str) -> AIInteractDecision:
     logger.info(f"[LangChain] interact_with_cv — query: {query[:100]}")
     system_prompt = get_cv_system_prompt()
     user_prompt = get_cv_interaction_prompt(json.dumps(cv.model_dump(by_alias=True)), query)
     
     llm = get_llm()
-    structured_llm = llm.with_structured_output(UserInteractResponse)
+    structured_llm = llm.with_structured_output(AIInteractDecision)
     
     try:
         result = await structured_llm.ainvoke([
@@ -102,6 +106,35 @@ async def interact_with_cv(cv: CVSchema, query: str) -> UserInteractResponse:
     except Exception as e:
         logger.error(f"[LangChain] interact_with_cv FAILED: {str(e)}")
         raise Exception(f"AI Generation Failed: {str(e)}")
+
+
+def extract_text_from_base64_file(file_base64: str, file_name: str) -> str:
+    """Decodes a base64 string and extracts text based on file extension."""
+    try:
+        if "," in file_base64:
+            file_base64 = file_base64.split(",")[1]
+            
+        file_bytes = base64.b64decode(file_base64)
+        ext = file_name.split(".")[-1].lower() if "." in file_name else ""
+        
+        extracted_text = ""
+        
+        if ext == "pdf":
+            doc = fitz.open(stream=file_bytes, filetype="pdf")
+            for page in doc:
+                extracted_text += page.get_text() + "\n"
+            doc.close()
+        elif ext in ["docx", "doc"]:
+            doc_stream = io.BytesIO(file_bytes)
+            document = docx.Document(doc_stream)
+            extracted_text = "\n".join([para.text for para in document.paragraphs])
+        else:
+            extracted_text = file_bytes.decode("utf-8", errors="ignore")
+            
+        return extracted_text.strip()
+    except Exception as e:
+        logger.error(f"[cv_service] Failed to extract text from {file_name}: {e}")
+        raise Exception(f"Failed to parse document: {str(e)}")
 
 async def generate_project_proposal(profile: str, project: str) -> str:
     logger.info(f"[LangChain] generate_project_proposal — profile: {len(profile)} chars, project: {len(project)} chars")

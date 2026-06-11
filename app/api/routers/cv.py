@@ -14,19 +14,51 @@ router = APIRouter(prefix="/API/CV", tags=["CV Generation and Optimization"])
 
 @router.post("/Build/old_cv", response_model=CVProfileResponse)
 async def build_old_cv(payload: CVBuildOldRequest):
-    """Converts old CV text into structured schema"""
+    """Converts old CV file into structured schema"""
     try:
-        cv = await cv_service.build_cv_from_text(payload.raw_text)
+        raw_text = cv_service.extract_text_from_base64_file(payload.file_base64, payload.file_name)
+        if not raw_text:
+            raise HTTPException(status_code=400, detail="Could not extract text from the provided file.")
+            
+        cv = await cv_service.build_cv_from_text(raw_text)
         return CVProfileResponse(cv_schema=cv)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/Build/Profile_cv", response_model=CVProfileResponse)
 async def build_profile_cv(payload: CVProfileRequest):
-    """Generates a CV schema based on user data"""
+    """Generates a CV schema based on a user profile ID"""
     try:
-        cv = await cv_service.build_cv_from_text(payload.user_data)
+        from app.services.db_services import fetch_full_user_profile
+        profile_data = fetch_full_user_profile(payload.user_id)
+        if not profile_data:
+            raise HTTPException(status_code=404, detail="Profile not found")
+            
+        # Format profile_data into a text prompt for the AI
+        user_data_text = f"Full Name: {profile_data.get('full_name', '')}\n"
+        user_data_text += f"Professional Title: {profile_data.get('professional_title', '')}\n"
+        user_data_text += f"Bio: {profile_data.get('bio', '')}\n"
+        user_data_text += f"Location: {profile_data.get('location', '')}\n"
+        user_data_text += f"Phone: {profile_data.get('phone_number', '')}\n"
+        user_data_text += f"Portfolio: {profile_data.get('portfolio_url', '')}\n"
+        user_data_text += f"Specialization: {profile_data.get('specialization', '')}\n"
+        
+        user_data_text += "\nExperience:\n"
+        for exp in profile_data.get('experience_list', []):
+            user_data_text += f"- {exp.get('job_title')} at {exp.get('company')} ({exp.get('start_date')} to {exp.get('end_date') or 'Present'}): {exp.get('description', '')}\n"
+            
+        user_data_text += "\nEducation:\n"
+        for edu in profile_data.get('education_list', []):
+            user_data_text += f"- {edu.get('degree')} at {edu.get('school')} ({edu.get('graduation_year')}): {edu.get('description', '')}\n"
+            
+        user_data_text += "\nSkills: " + ", ".join(profile_data.get('skills_list', []))
+
+        cv = await cv_service.build_cv_from_text(user_data_text)
         return CVProfileResponse(cv_schema=cv)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -59,8 +91,14 @@ async def optimize_ats(payload: OptimizeATSRequest):
 async def user_interact(payload: UserInteractRequest):
     """Modifies CV based on user requests"""
     try:
-        result = await cv_service.interact_with_cv(payload.cv, payload.user_query)
-        return result
+        decision = await cv_service.interact_with_cv(payload.cv, payload.user_query)
+        
+        final_cv = decision.modified_cv if decision.is_modified and decision.modified_cv else payload.cv
+        
+        return UserInteractResponse(
+            modified_cv=final_cv,
+            ai_message=decision.ai_message
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

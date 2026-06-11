@@ -298,3 +298,41 @@ def get_skills_map(junction_table: str, fk_column: str) -> Dict[int, List[str]]:
         logger.error(f"[db_services] get_skills_map({junction_table}) error: {e}")
         return {}
 
+
+def fetch_full_user_profile(user_id: int) -> Optional[Dict]:
+    """Fetches the full user profile including education, experience, and skills by user_id."""
+    supabase = get_supabase()
+    if not supabase:
+        return None
+        
+    try:
+        # Fetch base profile
+        profile_response = supabase.table("accounts_userprofile").select("*").eq("user_id", user_id).execute()
+        if not profile_response.data:
+            return None
+        profile_data = profile_response.data[0]
+        profile_id = profile_data["id"]
+        
+        # Fetch education
+        edu_response = supabase.table("accounts_education").select("*").eq("profile_id", profile_id).execute()
+        profile_data["education_list"] = edu_response.data or []
+        
+        # Fetch experience
+        exp_response = supabase.table("accounts_workexperience").select("*").eq("profile_id", profile_id).execute()
+        profile_data["experience_list"] = exp_response.data or []
+        
+        # Fetch skills
+        skills_junction = supabase.table("accounts_userprofile_skills").select("skill_id").eq("userprofile_id", profile_id).execute()
+        skill_ids = [item["skill_id"] for item in skills_junction.data] if skills_junction.data else []
+        
+        profile_data["skills_list"] = []
+        if skill_ids:
+            # We can use the existing get_all_skill_names helper to avoid doing an in_ query which might have limits,
+            # but an in_ query is fine for a few skills
+            skills_response = supabase.table("accounts_skill").select("name").in_("id", skill_ids).execute()
+            profile_data["skills_list"] = [item["name"] for item in skills_response.data] if skills_response.data else []
+            
+        return profile_data
+    except Exception as e:
+        logger.error(f"[db_services] fetch_full_user_profile error: {e}")
+        return None

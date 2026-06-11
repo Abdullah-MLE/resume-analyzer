@@ -83,7 +83,7 @@ class OptimizeATSRequest(BaseModel):
     cv: CVSchema
 
 class CVProfileRequest(BaseModel):
-    user_data: str
+    user_id: int
 
 class CVProfileResponse(BaseModel):
     cv_schema: CVSchema
@@ -99,7 +99,8 @@ class CVExtractedResponse(BaseModel):
     extracted_text: str
 
 class CVBuildOldRequest(BaseModel):
-    raw_text: str
+    file_base64: str
+    file_name: str
 
 class AIKeywordsRequest(BaseModel):
     cv_so_far: CVSchema
@@ -115,3 +116,8 @@ class UserInteractRequest(BaseModel):
 class UserInteractResponse(BaseModel):
     modified_cv: CVSchema
     ai_message: Optional[str] = None
+
+class AIInteractDecision(BaseModel):
+    is_modified: bool = Field(description="True if you modified the CV, False if you only want to reply with a message.")
+    modified_cv: Optional[CVSchema] = Field(description="The updated CV if modified, otherwise null.", default=None)
+    ai_message: str = Field(description="The conversational response from the AI.")

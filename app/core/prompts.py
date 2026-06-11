@@ -32,7 +32,9 @@ Target Job Description:
 Return the complete modified CV in the requested JSON format. Ensure all content, including any newly added skills or descriptions, is in English."""
 
 def get_cv_interaction_prompt(cv: str, query: str) -> str:
-    return f"""Update the following CV based on the user's specific request.
+    return f"""Based on the user's request, decide if you need to update their CV.
+If the user wants to add, change, or remove information from their CV, modify it and set 'is_modified' to true.
+If the user is just asking a question or the request doesn't require modifying the CV, set 'is_modified' to false and just reply in 'ai_message'.
 
 Current CV:
 {cv}
@@ -40,7 +42,7 @@ Current CV:
 User Request:
 {query}
 
-Return a JSON object containing the updated CV and an 'ai_message' responding to the user. Ensure the entire updated CV remains strictly in English. If the user request is in Arabic, the AI message MUST be in Arabic, but all CV fields must remain in English."""
+Return a JSON object containing your decision ('is_modified'), the 'modified_cv' (if is_modified is true), and an 'ai_message' responding to the user. Ensure the entire updated CV remains strictly in English. If the user request is in Arabic, the AI message MUST be in Arabic, but all CV fields must remain in English."""
 
 def get_proposal_prompt(profile: str, project: str) -> str:
     return f"""Write a professional and persuasive project proposal based on the user's profile and the project details.
