@@ -121,3 +121,32 @@ class AIInteractDecision(BaseModel):
     is_modified: bool = Field(description="True if you modified the CV, False if you only want to reply with a message.")
     modified_cv: Optional[CVSchema] = Field(description="The updated CV if modified, otherwise null.", default=None)
     ai_message: str = Field(description="The conversational response from the AI.")
+
+# 5. Matching Results Models
+class MatchedProjectResponse(BaseModel):
+    id: int
+    title: str
+    description: str
+    budget: Optional[str] = None
+    deadline: Optional[str] = None
+    duration: Optional[str] = None
+    status: Optional[str] = None
+    required_skills: List[str]
+    platform_name: str
+    source_url: str
+    posted_date: Optional[str] = None
+    scraped_at: str
+    match_score: float
+
+class MatchedJobResponse(BaseModel):
+    id: int
+    match_score: float
+    required_skills: List[str]
+    title: str
+    company: str
+    description: str
+    location: str
+    source_platform: str
+    source_url: str
+    posted_date: Optional[str] = None
+    scraped_at: str

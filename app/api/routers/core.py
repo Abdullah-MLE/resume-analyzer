@@ -1,7 +1,9 @@
+from typing import List
 from fastapi import APIRouter, HTTPException
 from app.api.models import (
     MatchRequest, MatchResponse,
-    ProposalRequest, ProposalResponse
+    ProposalRequest, ProposalResponse,
+    MatchedProjectResponse, MatchedJobResponse
 )
 from app.services import cv_service
 from app.core.logger import get_logger
@@ -35,6 +37,37 @@ async def generate_proposal(payload: ProposalRequest):
         proposal = await cv_service.generate_project_proposal(payload.user_profile, payload.project_details)
         return ProposalResponse(proposal_text=proposal)
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/matches/projects/{user_id}", response_model=List[MatchedProjectResponse])
+async def get_user_matched_projects(user_id: int):
+    """Returns the matched freelance projects for a user based on DB records."""
+    from app.services.db_services import get_matched_projects_for_user
+    try:
+        projects = get_matched_projects_for_user(user_id)
+        if not projects:
+            raise HTTPException(status_code=404, detail="Please fill out your profile")
+        return projects
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Matches] Projects error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/matches/jobs/{user_id}", response_model=List[MatchedJobResponse])
+async def get_user_matched_jobs(user_id: int):
+    """Returns the matched jobs for a user based on DB records."""
+    from app.services.db_services import get_matched_jobs_for_user
+    try:
+        jobs = get_matched_jobs_for_user(user_id)
+        if not jobs:
+            raise HTTPException(status_code=404, detail="Please choose or create a base CV")
+        return jobs
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[Matches] Jobs error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

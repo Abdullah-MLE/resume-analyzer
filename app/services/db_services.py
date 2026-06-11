@@ -336,3 +336,87 @@ def fetch_full_user_profile(user_id: int) -> Optional[Dict]:
     except Exception as e:
         logger.error(f"[db_services] fetch_full_user_profile error: {e}")
         return None
+
+def get_matched_projects_for_user(user_id: int) -> List[Dict]:
+    """Fetches matched projects for a user, formatted exactly as requested."""
+    supabase = get_supabase()
+    if not supabase:
+        return []
+        
+    try:
+        response = supabase.table("matching_matchresult").select(
+            "match_score, matched_skills, missing_skills, opportunities_freelanceproject(*)"
+        ).eq("user_id", user_id).not_.is_("project_id", "null").order("match_score", desc=True).execute()
+        
+        results = []
+        for row in response.data:
+            project = row.get("opportunities_freelanceproject", {})
+            if not project:
+                continue
+            
+            matched = row.get("matched_skills") or []
+            missing = row.get("missing_skills") or []
+            required_skills = matched + missing
+            
+            formatted = {
+                "id": project.get("id", 0),
+                "title": project.get("title", ""),
+                "description": project.get("description", ""),
+                "budget": project.get("budget", ""),
+                "deadline": project.get("deadline"),
+                "duration": project.get("duration", ""),
+                "status": project.get("status", ""),
+                "required_skills": required_skills,
+                "platform_name": project.get("platform_name", ""),
+                "source_url": project.get("source_url", ""),
+                "posted_date": project.get("posted_date"),
+                "scraped_at": project.get("scraped_at", ""),
+                "match_score": row.get("match_score", 0)
+            }
+            results.append(formatted)
+            
+        return results
+    except Exception as e:
+        logger.error(f"[db_services] get_matched_projects_for_user error: {e}")
+        return []
+
+def get_matched_jobs_for_user(user_id: int) -> List[Dict]:
+    """Fetches matched jobs for a user, formatted exactly as requested."""
+    supabase = get_supabase()
+    if not supabase:
+        return []
+        
+    try:
+        response = supabase.table("matching_matchresult").select(
+            "match_score, matched_skills, missing_skills, opportunities_job(*)"
+        ).eq("user_id", user_id).not_.is_("job_id", "null").order("match_score", desc=True).execute()
+        
+        results = []
+        for row in response.data:
+            job = row.get("opportunities_job", {})
+            if not job:
+                continue
+            
+            matched = row.get("matched_skills") or []
+            missing = row.get("missing_skills") or []
+            required_skills = matched + missing
+            
+            formatted = {
+                "id": job.get("id", 0),
+                "match_score": row.get("match_score", 0),
+                "required_skills": required_skills,
+                "title": job.get("title", ""),
+                "company": job.get("company", ""),
+                "description": job.get("description", ""),
+                "location": job.get("location", ""),
+                "source_platform": job.get("source_platform", ""),
+                "source_url": job.get("source_url", ""),
+                "posted_date": job.get("posted_date"),
+                "scraped_at": job.get("scraped_at", "")
+            }
+            results.append(formatted)
+            
+        return results
+    except Exception as e:
+        logger.error(f"[db_services] get_matched_jobs_for_user error: {e}")
+        return []

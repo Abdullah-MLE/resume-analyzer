@@ -149,7 +149,7 @@ def _match_opportunities_to_users(
             score = float(np.clip(sim[i][j], 0.0, 1.0))
             score_pct = round(score * 100, 2)
 
-            if score_pct < 50.0:
+            if score_pct < 30.0:
                 continue
 
             o_skills = set(opp_skills_map.get(opp["id"], []))
